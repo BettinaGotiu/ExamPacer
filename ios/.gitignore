@@ -1,0 +1,37 @@
+# Android build artifacts
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+**/android/.gradle/
+**/android/app/build/
+**/android/local.properties
+**/android/GeneratedPluginRegistrant.java
+.gradle/
+build/
+
+# Kotlin / Java caches
+.kotlin/
+**/kotlin-build/
+**/caches-jvm/
+
+# Flutter specific
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+**/lib/generated/
+
+# IDEs (VS Code & IntelliJ)
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Windows specific
+Thumbs.db
+desktop.ini
+
+# Crash logs
+flutter_*.log
