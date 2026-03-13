@@ -22,7 +22,7 @@ class _SigninScreenState extends State<SigninScreen> {
     return Scaffold(
       body: Container(
         width: MediaQuery.of(context).size.width,
-        height: MediaQuery.of(context).size.height, // Full screen height
+        height: MediaQuery.of(context).size.height,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [hexStringToColor("7766C6"), hexStringToColor("8A72E6")],
@@ -40,10 +40,8 @@ class _SigninScreenState extends State<SigninScreen> {
             ),
             child: Column(
               children: <Widget>[
-                // Logo image
                 authenticatorWidget("assets/images/lock.png"),
                 const SizedBox(height: 30),
-                // Email TextField
                 reusableTextField(
                   "Enter Email Of The Account",
                   Icons.person_outline,
@@ -51,15 +49,13 @@ class _SigninScreenState extends State<SigninScreen> {
                   _emailTextController,
                 ),
                 const SizedBox(height: 30),
-                // Password TextField
                 reusableTextField(
                   "Enter Password",
                   Icons.lock_outline,
-                  true, // Set true for password masking
+                  true,
                   _passwordTextController,
                 ),
                 const SizedBox(height: 30),
-                // Login Button
                 firebaseUIButton(context, "Sign In", () {
                   FirebaseAuth.instance
                       .signInWithEmailAndPassword(
@@ -73,7 +69,6 @@ class _SigninScreenState extends State<SigninScreen> {
                         );
                       })
                       .onError((error, stackTrace) {
-                        // Show an alert dialog with the error message
                         showDialog(
                           context: context,
                           builder: (BuildContext context) {
@@ -83,9 +78,7 @@ class _SigninScreenState extends State<SigninScreen> {
                               actions: [
                                 TextButton(
                                   onPressed: () {
-                                    Navigator.of(
-                                      context,
-                                    ).pop(); // Close the dialog
+                                    Navigator.of(context).pop();
                                   },
                                   child: const Text("OK"),
                                 ),

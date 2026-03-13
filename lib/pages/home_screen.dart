@@ -1,4 +1,5 @@
-import 'package:exampacer/helpers/widgets.dart';
+import 'package:exampacer/pages/calendar.dart';
+import 'package:exampacer/pages/settings_screen.dart';
 import 'package:exampacer/pages/speech_to_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -14,8 +15,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late User? user;
-  DateTime _focusedDay = DateTime.now(); // Current focused day
-  DateTime? _selectedDay; // Selected day on the calendar
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
 
   @override
   void initState() {
@@ -38,10 +39,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             onSelected: (value) {
               if (value == 'Settings') {
-                // Navigate to settings (route to be implemented later)
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Settings route not implemented'),
+                // Navigate to settings page
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
                   ),
                 );
               } else if (value == 'Logout') {
@@ -68,25 +70,36 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Calendar (Minimalistic version)
-            TableCalendar(
-              firstDay: DateTime.utc(2010, 10, 16),
-              lastDay: DateTime.utc(2030, 3, 14),
-              focusedDay: _focusedDay,
-              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              onDaySelected: (selectedDay, focusedDay) {
-                setState(() {
-                  _selectedDay = selectedDay;
-                  _focusedDay = focusedDay;
-                });
+            // Minimalistic calendar
+            GestureDetector(
+              onTap: () {
+                // Navigate to expanded calendar view
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CalendarScreen(),
+                  ),
+                );
               },
-              calendarFormat: CalendarFormat.week, // Minimalistic row version
-              onFormatChanged: (format) {}, // Disable format change for now
-              onPageChanged: (focusedDay) => _focusedDay = focusedDay,
-              locale: 'en_US', // Language set to English
+              child: TableCalendar(
+                firstDay: DateTime.utc(2010, 10, 16),
+                lastDay: DateTime.utc(2030, 3, 14),
+                focusedDay: _focusedDay,
+                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                onDaySelected: (selectedDay, focusedDay) {
+                  setState(() {
+                    _selectedDay = selectedDay;
+                    _focusedDay = focusedDay;
+                  });
+                },
+                calendarFormat: CalendarFormat.week, // Minimalistic row view
+                onFormatChanged: (format) {}, // Disable format change for now
+                onPageChanged: (focusedDay) => _focusedDay = focusedDay,
+                locale: 'en_US',
+              ),
             ),
             const SizedBox(height: 20),
-            // Cards Layout
+            // Cards layout
             Expanded(
               child: ListView(
                 children: [
