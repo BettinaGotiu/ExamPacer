@@ -2,7 +2,6 @@ import 'package:exampacer/helpers/color_style.dart';
 import 'package:exampacer/helpers/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'speech_to_text.dart';
 import 'home_screen.dart';
 import 'signup_screen.dart';
 
