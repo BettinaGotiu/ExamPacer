@@ -8,6 +8,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'signin_screen.dart';
+import 'history_screen.dart';
 import 'domains.dart';
 import 'daily_challenge_screen.dart';
 import 'package:mrx_charts/mrx_charts.dart';
@@ -24,6 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   List<Map<String, dynamic>> _sessions = [];
+  bool _showLastFiveSessions = true;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -47,8 +50,125 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  List<DateTime> _getCompletedSessionDates() {
+    return _sessions
+        .map((session) => DateTime.parse(session['date'] as String))
+        .toList();
+  }
+
+  Widget _buildLineChart() {
+    List<Map<String, dynamic>> sessionsToShow = _showLastFiveSessions
+        ? _sessions
+              .skip(_sessions.length > 5 ? _sessions.length - 5 : 0)
+              .toList()
+        : _sessions;
+
+    List<ChartLineDataItem> dataPoints = sessionsToShow
+        .asMap()
+        .entries
+        .map(
+          (entry) => ChartLineDataItem(
+            x: entry.key.toDouble() + 1,
+            value: entry.value['withinLimitPercentage'].toDouble(),
+          ),
+        )
+        .toList();
+
+    List<String> dateLabels = sessionsToShow
+        .map(
+          (session) => DateFormat(
+            'yyyy-MM-dd',
+          ).format(DateTime.parse(session['date'] as String)),
+        )
+        .toList();
+
+    return _sessions.isEmpty
+        ? Container(
+            height: 200,
+            child: Center(
+              child: Text(
+                'No session data available',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          )
+        : Column(
+            children: [
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Container(
+                  width: dataPoints.length * 100.0,
+                  height: 200,
+                  child: Chart(
+                    layers: [
+                      ChartAxisLayer(
+                        settings: ChartAxisSettings(
+                          x: ChartAxisSettingsAxis(
+                            frequency: 1.0,
+                            max: dataPoints.length.toDouble(),
+                            min: 1.0,
+                            textStyle: TextStyle(
+                              color: Colors.black,
+                              fontSize: 12.0,
+                            ),
+                          ),
+                          y: ChartAxisSettingsAxis(
+                            frequency: 10.0,
+                            max: 100.0,
+                            min: 0.0,
+                            textStyle: TextStyle(
+                              color: Colors.black,
+                              fontSize: 12.0,
+                            ),
+                          ),
+                        ),
+                        labelX: (value) => dateLabels[value.toInt() - 1],
+                        labelY: (value) => value.toString(),
+                      ),
+                      ChartLineLayer(
+                        items: dataPoints,
+                        settings: ChartLineSettings(
+                          color: Colors.blue,
+                          thickness: 2.0,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Scroll for more data',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          );
+  }
+
+  void _onItemTapped(int index) {
+    if (index == _selectedIndex) return;
+
+    if (index == 0) {
+      setState(() {
+        _selectedIndex = index;
+      });
+    } else if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const HistoryScreen()),
+      );
+    } else if (index == 2) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const SettingsScreen()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    List<DateTime> completedSessionDates = _getCompletedSessionDates();
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -98,87 +218,147 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CalendarScreen(),
-                  ),
-                );
-              },
-              child: TableCalendar(
-                firstDay: DateTime.utc(2010, 10, 16),
-                lastDay: DateTime.utc(2030, 3, 14),
-                focusedDay: _focusedDay,
-                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                onDaySelected: (selectedDay, focusedDay) {
-                  setState(() {
-                    _selectedDay = selectedDay;
-                    _focusedDay = focusedDay;
-                  });
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CalendarScreen(),
+                    ),
+                  );
                 },
-                calendarFormat: CalendarFormat.week,
-                onFormatChanged: (format) {},
-                onPageChanged: (focusedDay) => _focusedDay = focusedDay,
-                locale: 'en_US',
+                child: TableCalendar(
+                  firstDay: DateTime.utc(2010, 10, 16),
+                  lastDay: DateTime.utc(2030, 3, 14),
+                  focusedDay: _focusedDay,
+                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() {
+                      _selectedDay = selectedDay;
+                      _focusedDay = focusedDay;
+                    });
+                  },
+                  calendarFormat: CalendarFormat.week,
+                  onFormatChanged: (format) {},
+                  onPageChanged: (focusedDay) => _focusedDay = focusedDay,
+                  locale: 'en_US',
+                  calendarBuilders: CalendarBuilders(
+                    defaultBuilder: (context, day, focusedDay) {
+                      if (completedSessionDates.contains(day)) {
+                        return Center(
+                          child: Stack(
+                            children: [
+                              Center(
+                                child: Text(
+                                  '${day.day}',
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                              ),
+                              Positioned(
+                                right: 4,
+                                bottom: 4,
+                                child: Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                  size: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      return Center(
+                        child: Text(
+                          '${day.day}',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: ListView(
+              const SizedBox(height: 20),
+              buildCard(
+                title: "Real-Time Sessions",
+                description: "Engage in live sessions with our tool.",
+                context: context,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SpeechToTextPage(),
+                    ),
+                  );
+                },
+              ),
+              buildCard(
+                title: "Practice Exercises",
+                description: "Enhance your skills with practice tasks.",
+                context: context,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DomainSelectionPage(),
+                    ),
+                  );
+                },
+              ),
+              buildCard(
+                title: "Daily Challenge",
+                description: "Try a new challenge every day.",
+                context: context,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DailyChallengePage(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              Row(
                 children: [
-                  buildCard(
-                    title: "Real-Time Sessions",
-                    description: "Engage in live sessions with our tool.",
-                    context: context,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SpeechToTextPage(),
-                        ),
-                      );
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _showLastFiveSessions = true;
+                      });
                     },
+                    child: const Text('Last 5 Sessions'),
                   ),
-                  buildCard(
-                    title: "Practice Exercises",
-                    description: "Enhance your skills with practice tasks.",
-                    context: context,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DomainSelectionPage(),
-                        ),
-                      );
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _showLastFiveSessions = false;
+                      });
                     },
+                    child: const Text('All Time Progress'),
                   ),
-                  buildCard(
-                    title: "Daily Challenge",
-                    description: "Try a new challenge every day.",
-                    context: context,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const DailyChallengePage(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  // Line chart
-                  _buildLineChart(),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              _buildLineChart(),
+            ],
+          ),
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'User'),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.amber[800],
+        onTap: _onItemTapped,
       ),
     );
   }
@@ -202,69 +382,5 @@ class _HomeScreenState extends State<HomeScreen> {
         trailing: ElevatedButton(onPressed: onTap, child: const Text("Start")),
       ),
     );
-  }
-
-  Widget _buildLineChart() {
-    List<ChartLineDataItem> dataPoints = _sessions
-        .asMap()
-        .entries
-        .map(
-          (entry) => ChartLineDataItem(
-            x: entry.key.toDouble() + 1,
-            value: entry.value['withinLimitPercentage'].toDouble(),
-          ),
-        )
-        .toList();
-
-    List<String> dateLabels = _sessions
-        .map(
-          (session) => DateFormat(
-            'yyyy-MM-dd',
-          ).format(DateTime.parse(session['date'] as String)),
-        )
-        .toList();
-
-    return _sessions.isEmpty
-        ? Container(
-            height: 200,
-            child: Center(
-              child: Text(
-                'No session data available',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-          )
-        : Container(
-            height: 200,
-            child: Chart(
-              layers: [
-                ChartAxisLayer(
-                  settings: ChartAxisSettings(
-                    x: ChartAxisSettingsAxis(
-                      frequency: 1.0,
-                      max: _sessions.length.toDouble(),
-                      min: 1.0,
-                      textStyle: TextStyle(color: Colors.black, fontSize: 12.0),
-                    ),
-                    y: ChartAxisSettingsAxis(
-                      frequency: 10.0,
-                      max: 100.0,
-                      min: 0.0,
-                      textStyle: TextStyle(color: Colors.black, fontSize: 12.0),
-                    ),
-                  ),
-                  labelX: (value) => dateLabels[value.toInt() - 1],
-                  labelY: (value) => value.toString(),
-                ),
-                ChartLineLayer(
-                  items: dataPoints,
-                  settings: ChartLineSettings(
-                    color: Colors.blue,
-                    thickness: 2.0,
-                  ),
-                ),
-              ],
-            ),
-          );
   }
 }
