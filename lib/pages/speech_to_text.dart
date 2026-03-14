@@ -1,3 +1,5 @@
+import 'package:exampacer/helpers/common_expressions.dart';
+import 'package:exampacer/pages/results_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:async';
@@ -28,6 +30,7 @@ class SpeechToTextPage extends StatefulWidget {
 
 class _SpeechToTextPageState extends State<SpeechToTextPage> {
   late stt.SpeechToText _speech;
+  late CommonExpressions _commonExpressions;
   bool _isListening = false;
   String _currentText = "";
   bool _hasSpeechError = false;
@@ -42,16 +45,23 @@ class _SpeechToTextPageState extends State<SpeechToTextPage> {
   List<double> _wpmList = [];
 
   double _currentWpm = 0.0;
+  List<double> _wpmHistory = []; // To store WPMs for calculating the average
+  int _withinLimitCount = 0; // To track the number of WPM within the limits
 
   final ScrollController _scrollController = ScrollController();
 
+  // New variables for pace selection and warning message
   String? _selectedPace;
   String _warningMessage = '';
+  bool _paceSelected = false;
+  final int _intervalDuration = 6; // Interval duration in seconds
 
   @override
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
+    _commonExpressions = CommonExpressions();
+    _commonExpressions.loadExpressions();
   }
 
   int _countWords(String text) {
@@ -73,6 +83,10 @@ class _SpeechToTextPageState extends State<SpeechToTextPage> {
       );
       return;
     }
+
+    setState(() {
+      _paceSelected = true; // Disable pace selection buttons
+    });
 
     bool available = await _speech.initialize(
       onStatus: (status) {
@@ -104,11 +118,12 @@ class _SpeechToTextPageState extends State<SpeechToTextPage> {
         setState(() {});
       });
 
-      _wpmTimer = Timer.periodic(const Duration(seconds: 6), (timer) {
+      _wpmTimer = Timer.periodic(Duration(seconds: _intervalDuration), (timer) {
         setState(() {
           int wordCount = _countWords(_currentText);
           int elapsedSeconds = _stopwatch.elapsed.inSeconds;
           _currentWpm = _calculateWPM(wordCount, elapsedSeconds);
+          _wpmHistory.add(_currentWpm); // Add to WPM history
 
           // Determine the pace limits based on the selected pace
           int lowerLimit, upperLimit;
@@ -137,6 +152,7 @@ class _SpeechToTextPageState extends State<SpeechToTextPage> {
             _warningMessage = "Your talking pace is too fast, go slower.";
           } else {
             _warningMessage = "You are right on track, go on!";
+            _withinLimitCount++;
           }
         });
       });
@@ -165,6 +181,42 @@ class _SpeechToTextPageState extends State<SpeechToTextPage> {
         _recordingDurations.add(duration);
         _wordCounts.add(wordCount);
         _wpmList.add(_calculateWPM(wordCount, duration));
+
+        // Immediate WPM calculation for sessions shorter than interval duration
+        if (duration < _intervalDuration) {
+          _currentWpm = _calculateWPM(wordCount, duration);
+          _wpmHistory.add(_currentWpm); // Add to WPM history
+
+          // Determine the pace limits based on the selected pace
+          int lowerLimit, upperLimit;
+          switch (_selectedPace) {
+            case "100-130":
+              lowerLimit = 100;
+              upperLimit = 130;
+              break;
+            case "130-160":
+              lowerLimit = 130;
+              upperLimit = 160;
+              break;
+            case "160-210":
+              lowerLimit = 160;
+              upperLimit = 210;
+              break;
+            default:
+              lowerLimit = 0;
+              upperLimit = 0;
+          }
+
+          // Update the warning message based on the current WPM
+          if (_currentWpm < lowerLimit) {
+            _warningMessage = "You are talking too slow, pick the pace up.";
+          } else if (_currentWpm > upperLimit) {
+            _warningMessage = "Your talking pace is too fast, go slower.";
+          } else {
+            _warningMessage = "You are right on track, go on!";
+            _withinLimitCount++;
+          }
+        }
       }
 
       _currentText = "";
@@ -179,6 +231,32 @@ class _SpeechToTextPageState extends State<SpeechToTextPage> {
     _speech.stop();
     _timer.cancel();
     _wpmTimer.cancel();
+  }
+
+  void _stopListeningAndNavigate() {
+    _stopListening();
+
+    // Calculate the average WPM
+    double averageWpm = _wpmHistory.isNotEmpty
+        ? _wpmHistory.reduce((a, b) => a + b) / _wpmHistory.length
+        : 0.0;
+
+    // Calculate the percentage of time within limits
+    double withinLimitPercentage = _wpmHistory.isNotEmpty
+        ? (_withinLimitCount / _wpmHistory.length) * 100
+        : 0.0;
+
+    // Navigate to results screen with the data
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ResultsScreen(
+          spokenText: _recognizedParagraphs.join(' '),
+          averageWpm: averageWpm,
+          withinLimitPercentage: withinLimitPercentage,
+        ),
+      ),
+    );
   }
 
   void _restartListening() {
@@ -204,9 +282,13 @@ class _SpeechToTextPageState extends State<SpeechToTextPage> {
       _recordingDurations.clear();
       _wordCounts.clear();
       _wpmList.clear();
+      _wpmHistory.clear(); // Clear WPM history
       _currentText = "";
       _currentWpm = 0.0;
       _warningMessage = '';
+      _paceSelected = false; // Allow pace selection again
+      _selectedPace = null; // Clear selected pace
+      _withinLimitCount = 0; // Reset within limit count
     });
   }
 
@@ -250,32 +332,48 @@ class _SpeechToTextPageState extends State<SpeechToTextPage> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _selectedPace = "100-130";
-                    });
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                  onPressed: _paceSelected
+                      ? null
+                      : () {
+                          setState(() {
+                            _selectedPace = "100-130";
+                          });
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _paceSelected
+                        ? Colors.grey
+                        : Colors.blue, // Disable button color
+                  ),
                   child: const Text("100-130"),
                 ),
                 ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _selectedPace = "130-160";
-                    });
-                  },
+                  onPressed: _paceSelected
+                      ? null
+                      : () {
+                          setState(() {
+                            _selectedPace = "130-160";
+                          });
+                        },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: _paceSelected
+                        ? Colors.grey
+                        : Colors.green, // Disable button color
                   ),
                   child: const Text("130-160"),
                 ),
                 ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _selectedPace = "160-210";
-                    });
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  onPressed: _paceSelected
+                      ? null
+                      : () {
+                          setState(() {
+                            _selectedPace = "160-210";
+                          });
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _paceSelected
+                        ? Colors.grey
+                        : Colors.red, // Disable button color
+                  ),
                   child: const Text("160-210"),
                 ),
               ],
@@ -398,6 +496,11 @@ class _SpeechToTextPageState extends State<SpeechToTextPage> {
                   onPressed: _startNewSession,
                   tooltip: 'Start New Session',
                   child: const Icon(Icons.replay),
+                ),
+                FloatingActionButton(
+                  onPressed: _stopListeningAndNavigate,
+                  tooltip: 'Stop and View Results',
+                  child: const Icon(Icons.stop),
                 ),
                 if (_isListening)
                   FloatingActionButton(
