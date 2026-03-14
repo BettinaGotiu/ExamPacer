@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../helpers/widgets.dart';
 import 'home_screen.dart';
 import '../helpers/color_style.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({Key? key}) : super(key: key);
@@ -26,10 +27,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
               password: _passwordTextController.text,
             );
 
+        // Update the user's display name with the username
         await userCredential.user!.updateDisplayName(
           _userNameTextController.text.trim(),
         );
 
+        // Create a collection for the user in Firestore
+        await FirebaseFirestore.instance
+            .collection('user_data')
+            .doc(userCredential.user!.uid)
+            .set({
+              'email': _emailTextController.text.trim(),
+              'username': _userNameTextController.text.trim(),
+            });
+
+        // Navigate to HomeScreen upon successful registration
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const HomeScreen()),
