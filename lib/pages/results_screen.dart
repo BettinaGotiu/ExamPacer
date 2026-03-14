@@ -28,6 +28,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
   bool _isLoading = true; // For displaying the loading widget
   double? _lastSessionsAverage;
   List<Map<String, dynamic>> _sessions = [];
+  Map<String, double> _averageWordCounts = {};
+  bool _showText = false; // For showing/hiding the text
 
   @override
   void initState() {
@@ -84,9 +86,37 @@ class _ResultsScreenState extends State<ResultsScreen> {
             : 0.0;
       });
 
+      // Calculate the average occurrences of each word
+      _calculateAverageWordCounts();
+
       // Save the current session
       await _saveResultsToFirestore(userCollection);
     }
+  }
+
+  void _calculateAverageWordCounts() {
+    Map<String, int> totalWordCounts = {};
+
+    // Initialize counts to 0
+    commonWords.forEach((expression) {
+      totalWordCounts[expression] = 0;
+    });
+
+    // Sum occurrences of each expression across all sessions
+    for (var session in _sessions) {
+      Map<String, int> sessionWordCounts = Map<String, int>.from(
+        session['commonWordCounts'],
+      );
+      sessionWordCounts.forEach((word, count) {
+        totalWordCounts[word] = (totalWordCounts[word] ?? 0) + count;
+      });
+    }
+
+    // Calculate the average occurrences
+    int sessionCount = _sessions.length;
+    totalWordCounts.forEach((word, totalCount) {
+      _averageWordCounts[word] = totalCount / sessionCount;
+    });
   }
 
   Future<void> _saveResultsToFirestore(
@@ -110,7 +140,12 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }
 
   Widget _buildLineChart() {
-    List<ChartLineDataItem> dataPoints = _sessions
+    // Get the last 5 sessions
+    List<Map<String, dynamic>> sessionsToShow = _sessions
+        .skip(_sessions.length > 5 ? _sessions.length - 5 : 0)
+        .toList();
+
+    List<ChartLineDataItem> dataPoints = sessionsToShow
         .asMap()
         .entries
         .map(
@@ -121,24 +156,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
         )
         .toList();
 
-    // Add the new session data point
-    dataPoints.add(
-      ChartLineDataItem(
-        x: dataPoints.length + 1.0,
-        value: widget.withinLimitPercentage,
-      ),
-    );
-
-    List<String> dateLabels = _sessions
+    List<String> dateLabels = sessionsToShow
         .map(
           (session) => DateFormat(
             'yyyy-MM-dd',
           ).format(DateTime.parse(session['date'] as String)),
         )
         .toList();
-
-    // Add label for the new session
-    dateLabels.add(DateFormat('yyyy-MM-dd').format(DateTime.now()));
 
     return _sessions.isEmpty
         ? Container(
@@ -196,6 +220,59 @@ class _ResultsScreenState extends State<ResultsScreen> {
           );
   }
 
+  void _showSpokenTextPopup() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Spoken Text"),
+          content: SingleChildScrollView(
+            child: RichText(
+              text: TextSpan(
+                children: _buildHighlightedText(widget.spokenText),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text("Close"),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  List<TextSpan> _buildHighlightedText(String text) {
+    List<TextSpan> spans = [];
+    text.split(' ').forEach((word) {
+      if (_commonWordCounts.containsKey(word.toLowerCase()) &&
+          _commonWordCounts[word.toLowerCase()]! > 2) {
+        spans.add(
+          TextSpan(
+            text: '$word ',
+            style: TextStyle(
+              color: Colors.red,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+        );
+      } else {
+        spans.add(
+          TextSpan(
+            text: '$word ',
+            style: TextStyle(fontSize: 16, color: Colors.black),
+          ),
+        );
+      }
+    });
+    return spans;
+  }
+
   @override
   Widget build(BuildContext context) {
     String comparisonMessage = '';
@@ -213,6 +290,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
       }
     }
 
+    bool hasCommonWords = _commonWordCounts.values.any((count) => count >= 2);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Results')),
       body: _isLoading
@@ -227,19 +306,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Spoken Text:',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            widget.spokenText,
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                          const SizedBox(height: 20),
                           const Text(
                             'Average Words Per Minute:',
                             style: TextStyle(
@@ -266,20 +332,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                             style: const TextStyle(fontSize: 16),
                           ),
                           const SizedBox(height: 20),
-                          const Text(
-                            'Common Words and Expressions:',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          ..._commonWordCounts.entries.map((entry) {
-                            return Text(
-                              '${entry.key}: ${entry.value} times',
-                              style: const TextStyle(fontSize: 16),
-                            );
-                          }).toList(),
+                          _buildLineChart(), // Add the line chart here
                           const SizedBox(height: 20),
                           if (comparisonMessage.isNotEmpty)
                             Text(
@@ -291,7 +344,43 @@ class _ResultsScreenState extends State<ResultsScreen> {
                               ),
                             ),
                           const SizedBox(height: 20),
-                          _buildLineChart(), // Add the line chart here
+                          const Text(
+                            'Common Words and Expressions:',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          if (hasCommonWords)
+                            ..._commonWordCounts.entries
+                                .where((entry) => entry.value >= 2)
+                                .map((entry) {
+                                  double averageCount =
+                                      _averageWordCounts[entry.key] ?? 0.0;
+                                  double percentageDifference =
+                                      ((entry.value - averageCount) /
+                                          averageCount) *
+                                      100;
+                                  return Text(
+                                    '${entry.key}: ${entry.value} times (current session is ${percentageDifference.toStringAsFixed(2)}% compared to the average of ${averageCount.toStringAsFixed(2)} occurrences/session)',
+                                    style: const TextStyle(fontSize: 16),
+                                  );
+                                })
+                                .toList()
+                          else
+                            Text(
+                              'Great job! No common words appeared more than twice.',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          const SizedBox(height: 20),
+                          ElevatedButton(
+                            onPressed: _showSpokenTextPopup,
+                            child: Text("Show Appearances"),
+                          ),
                           const SizedBox(
                             height: 20,
                           ), // Add some space at the bottom
