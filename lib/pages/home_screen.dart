@@ -146,22 +146,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onItemTapped(int index) {
-    if (index == _selectedIndex) return;
-
-    if (index == 0) {
-      setState(() {
-        _selectedIndex = index;
-      });
-    } else if (index == 1) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const HistoryScreen()),
-      );
-    } else if (index == 2) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const SettingsScreen()),
-      );
+    setState(() {
+      _selectedIndex = index;
+    });
+    switch (index) {
+      case 0:
+        // Home is the current screen
+        break;
+      case 1:
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const HistoryScreen()),
+        );
+        break;
+      case 2:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const PersonalizedWordsPage(),
+          ),
+        );
+        break;
+      case 3:
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const SettingsScreen()),
+        );
+        break;
     }
   }
 
@@ -198,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     (route) => false,
                   );
                 });
-              } else if (value == 'Personalized Words') {
+              } else if (value == 'Filler Words') {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -211,8 +222,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const PopupMenuItem(value: 'Settings', child: Text('Settings')),
               const PopupMenuItem(value: 'Logout', child: Text('Logout')),
               const PopupMenuItem(
-                value: 'Personalized Words',
-                child: Text('Personalized Words'),
+                value: 'Filler Words',
+                child: Text('Filler Words'),
               ),
             ],
           ),
@@ -352,13 +363,30 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'User'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home, size: 20),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history, size: 20),
+            label: 'History',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.edit_note, size: 20),
+            label: 'Filler Words',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person, size: 20),
+            label: 'User',
+          ),
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: Colors.amber[800],
+        unselectedItemColor: Colors.grey,
         onTap: _onItemTapped,
+        showUnselectedLabels: true,
+        selectedFontSize: 12,
+        unselectedFontSize: 10,
       ),
     );
   }
