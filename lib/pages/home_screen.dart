@@ -1,4 +1,5 @@
 import 'package:exampacer/pages/calendar.dart';
+import 'package:exampacer/pages/personalized_words_page.dart';
 import 'package:exampacer/pages/settings_screen.dart';
 import 'package:exampacer/pages/speech_to_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -59,11 +60,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     (route) => false,
                   );
                 });
+              } else if (value == 'Personalized Words') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PersonalizedWordsPage(),
+                  ),
+                );
               }
             },
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'Settings', child: Text('Settings')),
               const PopupMenuItem(value: 'Logout', child: Text('Logout')),
+              const PopupMenuItem(
+                value: 'Personalized Words',
+                child: Text('Personalized Words'),
+              ),
             ],
           ),
         ],
