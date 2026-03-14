@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../helpers/widgets.dart';
 import 'home_screen.dart';
 import '../helpers/color_style.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({Key? key}) : super(key: key);
@@ -18,6 +18,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController _userNameTextController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
+  // Initial common words and their counts
+  final Map<String, int> initialCommonWords = {
+    'actually': 0,
+    'basically': 0,
+    'like': 0,
+    'literally': 0,
+    'you know': 0,
+  };
+
+  // Metoda pentru a crea un user nou in Firebase Authentication
   void _signUp() async {
     if (_formKey.currentState!.validate()) {
       try {
@@ -32,14 +42,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
           _userNameTextController.text.trim(),
         );
 
-        // Create a collection for the user in Firestore
+        // Crearea colectiei in Cloud Firestore pentru user unde se vor salva sesiunile
         await FirebaseFirestore.instance
             .collection('user_data')
             .doc(userCredential.user!.uid)
             .set({
               'email': _emailTextController.text.trim(),
               'username': _userNameTextController.text.trim(),
-            });
+              'commonWordCounts': initialCommonWords, // Salvam cuvintele comune
+            }); // Userul are un UID unic si legam UID-ul pentru user_data
 
         // Navigate to HomeScreen upon successful registration
         Navigator.pushReplacement(
