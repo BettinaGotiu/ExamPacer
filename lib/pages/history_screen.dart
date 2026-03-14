@@ -18,7 +18,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   List<Map<String, dynamic>> _sessions = [];
   int _selectedIndex = 1;
   bool _isEditMode = false;
-  Map<String, dynamic>? _selectedSession;
+  bool _isLoading = true;
+  bool _noSessionsFound = false;
 
   @override
   void initState() {
@@ -36,10 +37,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
           .orderBy('date')
           .get();
 
+      await Future.delayed(const Duration(seconds: 2)); // Artificial delay
+
       setState(() {
         _sessions = snapshot.docs
             .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
             .toList();
+        _isLoading = false;
+        _noSessionsFound = _sessions.isEmpty;
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+        _noSessionsFound = true;
       });
     }
   }
@@ -121,34 +131,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
       appBar: AppBar(
         title: const Text('History'),
         automaticallyImplyLeading: false, // Remove the back button
-        actions: _sessions.isNotEmpty
-            ? [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: ElevatedButton.icon(
-                    onPressed: _toggleEditMode,
-                    icon: Icon(
-                      _isEditMode ? Icons.check : Icons.edit,
-                      color: Colors.white,
-                    ),
-                    label: Text(
-                      _isEditMode ? "Done" : "Edit",
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isEditMode ? Colors.green : Colors.red,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                  ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ElevatedButton.icon(
+              onPressed: _toggleEditMode,
+              icon: Icon(
+                _isEditMode ? Icons.check : Icons.edit,
+                color: Colors.white,
+              ),
+              label: Text(
+                _isEditMode ? "Done" : "Edit",
+                style: const TextStyle(color: Colors.white),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isEditMode ? Colors.green : Colors.red,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ]
-            : null,
+              ),
+            ),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: _sessions.isEmpty
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _noSessionsFound
             ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -172,67 +182,63 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
               )
             : SingleChildScrollView(
-                child: Column(
-                  children: [
-                    CustomPaint(
-                      painter: PathPainter(_sessions.length),
-                      child: SizedBox(
-                        height: _sessions.length * 250.0,
-                        child: Stack(
-                          children: List.generate(_sessions.length, (index) {
-                            final isEven = index % 2 == 0;
-                            final randomOffset =
-                                Random().nextDouble() * 40 - 20;
-                            final positionLeft = isEven
-                                ? MediaQuery.of(context).size.width / 2 -
-                                      120 +
-                                      randomOffset
-                                : MediaQuery.of(context).size.width / 2 +
-                                      20 +
-                                      randomOffset;
-                            final sessionSize = 90.0;
-                            final sessionDateTime = DateTime.parse(
-                              _sessions[index]['date'],
-                            );
-                            final formattedDateTime = _formatDate(
-                              sessionDateTime,
-                            );
-                            return Positioned(
-                              top: index * 250.0,
-                              left: positionLeft.clamp(
-                                16.0,
-                                MediaQuery.of(context).size.width - 166.0,
-                              ), // Account for padding
-                              child: GestureDetector(
-                                onTap: !_isEditMode
-                                    ? () {
-                                        setState(() {
-                                          _selectedSession = _sessions[index];
-                                        });
-                                      }
-                                    : null,
-                                child: SessionNode(
-                                  sessionNumber: index + 1,
-                                  sessionDate: formattedDateTime,
-                                  size: sessionSize,
-                                  isEditMode: _isEditMode,
-                                  onDelete: () {
-                                    _confirmDeleteSession(
-                                      _sessions[index]['id'],
-                                      formattedDateTime,
+                child: CustomPaint(
+                  painter: PathPainter(_sessions.length),
+                  child: SizedBox(
+                    height: _sessions.length * 250.0,
+                    child: Stack(
+                      children: List.generate(_sessions.length, (index) {
+                        final isEven = index % 2 == 0;
+                        final randomOffset = Random().nextDouble() * 40 - 20;
+                        final positionLeft = isEven
+                            ? MediaQuery.of(context).size.width / 2 -
+                                  120 +
+                                  randomOffset
+                            : MediaQuery.of(context).size.width / 2 +
+                                  20 +
+                                  randomOffset;
+                        final sessionSize = 90.0;
+                        final sessionDateTime = DateTime.parse(
+                          _sessions[index]['date'],
+                        );
+                        final formattedDateTime = _formatDate(sessionDateTime);
+                        return Positioned(
+                          top: index * 250.0,
+                          left: positionLeft.clamp(
+                            16.0,
+                            MediaQuery.of(context).size.width - 166.0,
+                          ), // Account for padding
+                          child: GestureDetector(
+                            onTap: !_isEditMode
+                                ? () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            SessionDetailScreen(
+                                              session: _sessions[index],
+                                            ),
+                                      ),
                                     );
-                                  },
-                                ),
-                              ),
-                            );
-                          }),
-                        ),
-                      ),
+                                  }
+                                : null,
+                            child: SessionNode(
+                              sessionNumber: index + 1,
+                              sessionDate: formattedDateTime,
+                              size: sessionSize,
+                              isEditMode: _isEditMode,
+                              onDelete: () {
+                                _confirmDeleteSession(
+                                  _sessions[index]['id'],
+                                  formattedDateTime,
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      }),
                     ),
-                    const SizedBox(height: 20),
-                    if (_selectedSession != null)
-                      SessionChart(session: _selectedSession!),
-                  ],
+                  ),
                 ),
               ),
       ),
@@ -350,95 +356,48 @@ class SessionNode extends StatelessWidget {
   }
 }
 
-class SessionChart extends StatelessWidget {
+class SessionDetailScreen extends StatelessWidget {
   final Map<String, dynamic> session;
 
-  const SessionChart({Key? key, required this.session}) : super(key: key);
+  const SessionDetailScreen({Key? key, required this.session})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      margin: const EdgeInsets.all(16.0),
-      child: Padding(
+    return Scaffold(
+      appBar: AppBar(title: const Text('Session Details')),
+      body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Session Chart for: ${session['date']}',
+              'Date: ${session['date']}',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-            Text('Average WPM: ${session['averageWpm']}'),
-            Text('Within Limit %: ${session['withinLimitPercentage']}'),
+            Text(
+              'Average WPM: ${session['averageWpm']}',
+              style: const TextStyle(fontSize: 16),
+            ),
             const SizedBox(height: 10),
-            Center(
-              child: RadialChart(session: session), // Replace with chart widget
+            Text(
+              'Within Limit Percentage: ${session['withinLimitPercentage']}',
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Spoken Text: ${session['spokenText']}',
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Common Word Counts: ${session['commonWordCounts']}',
+              style: const TextStyle(fontSize: 16),
             ),
           ],
         ),
       ),
     );
   }
-}
-
-// Implement the RadialChart widget
-class RadialChart extends StatelessWidget {
-  final Map<String, dynamic> session;
-
-  const RadialChart({Key? key, required this.session}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    // Dummy data for radial chart
-    final data = session.entries
-        .where((entry) => entry.value is int && entry.value > 2)
-        .toList();
-    final total = data.fold(0, (sum, entry) => sum + entry.value as int);
-
-    return SizedBox(
-      width: 200,
-      height: 200,
-      child: CustomPaint(
-        painter: RadialChartPainter(data.cast<MapEntry<String, int>>(), total),
-      ),
-    );
-  }
-}
-
-class RadialChartPainter extends CustomPainter {
-  final List<MapEntry<String, int>> data;
-  final int total;
-
-  RadialChartPainter(this.data, this.total);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 20;
-
-    double startAngle = -pi / 2;
-    for (final entry in data) {
-      final sweepAngle = (entry.value / total) * 2 * pi;
-      paint.color =
-          Colors.primaries[entry.key.hashCode % Colors.primaries.length];
-      canvas.drawArc(
-        Rect.fromCenter(
-          center: Offset(size.width / 2, size.height / 2),
-          width: size.width,
-          height: size.height,
-        ),
-        startAngle,
-        sweepAngle,
-        false,
-        paint,
-      );
-      startAngle += sweepAngle;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
